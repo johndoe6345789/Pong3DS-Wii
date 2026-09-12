@@ -75,6 +75,9 @@ static void layout(void)
     float stack_h = PONG_TOP_H + gap + PONG_BOTTOM_H;
     float stack_scale = SDL_min((float)w / stack_w, (float)h / stack_h);
 
+    /* FULL is the window itself: no offset, no scale, real pixels. */
+    s_vp[PONG_SURFACE_FULL] = (Viewport){ 0.0f, 0.0f, (float)w, (float)h, 1.0f };
+
     if (side_scale >= stack_scale) {
         float sc = side_scale;
         float total_w = side_w * sc, total_h = side_h * sc;
@@ -127,6 +130,14 @@ static bool build_font(void)
 
 static int s_req_w = 1280, s_req_h = 560;
 
+void pong_gfx_output_size(int *w, int *h)
+{
+    int ow = 0, oh = 0;
+    if (s_ren) SDL_GetRenderOutputSize(s_ren, &ow, &oh);
+    if (w) *w = ow;
+    if (h) *h = oh;
+}
+
 void pong_gfx_request_size(int w, int h)
 {
     if (w > 0 && h > 0) { s_req_w = w; s_req_h = h; }
@@ -145,6 +156,10 @@ bool pong_gfx_init(const char *title)
         return false;
     }
     SDL_SetRenderDrawBlendMode(s_ren, SDL_BLENDMODE_BLEND);
+    /* Vsync on: the simulation is 60Hz and the interpolator is written around
+     * that, so rendering at 122fps spends the machine to redraw states that
+     * have not changed. */
+    SDL_SetRenderVSync(s_ren, 1);
     if (!build_font()) {
         fprintf(stderr, "font atlas: %s\n", SDL_GetError());
         return false;

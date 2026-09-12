@@ -49,3 +49,4 @@ vita/*.velf
 vita/*.vpk
 vita/eboot.bin
 vita/param.sfo
+pc/pong-pc.cfg

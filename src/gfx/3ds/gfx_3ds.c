@@ -19,6 +19,13 @@ static bool s_ready = false;
 
 const char *pong_gfx_platform_name(void) { return "3ds"; }
 
+void pong_gfx_output_size(int *w, int *h)
+{
+    /* The handheld UI never asks; reported for completeness. */
+    if (w) *w = (int)PONG_TOP_W;
+    if (h) *h = (int)PONG_TOP_H;
+}
+
 void pong_gfx_request_size(int w, int h)
 {
     (void)w; (void)h;   /* the console's screens are its screens */

@@ -143,6 +143,13 @@ void pong_gfx_frame_end(void)
     vita2d_swap_buffers();
 }
 
+void pong_gfx_output_size(int *w, int *h)
+{
+    /* The handheld UI never asks; reported for completeness. */
+    if (w) *w = (int)PONG_TOP_W;
+    if (h) *h = (int)PONG_TOP_H;
+}
+
 void pong_gfx_request_size(int w, int h)
 {
     (void)w; (void)h;   /* 960x544, and not negotiable */

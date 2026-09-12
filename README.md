@@ -23,21 +23,34 @@ HTTP long-poll, so it works even where WebSockets don't survive the proxy.
 The same `src/ui/render.c` draws all three. Each platform supplies a renderer
 backend behind `src/gfx/gfx.h` and nothing else changes.
 
-### PC — SDL3, 1280x560
+### PC — SDL3, its own interface
 
-![PC](docs/previews/pc.png)
+The desktop build is **not the handheld one in a window**. One canvas, a
+full-size playfield, a scoreboard above it and a proper menu -- the same
+reasoning that gives the browser client its own interface. A window is not a
+3DS, and making either pretend to be the other makes both worse.
 
-### PS Vita — 960x544
+![PC menu](docs/previews/pc_menu.png)
+
+![PC in a match](docs/previews/pc_play.png)
+
+Keyboard, mouse, or a gamepad -- SDL3 knows the DualSense natively, so a PS5
+controller is plug-and-play and the on-screen hints switch to its button names
+when one is attached. Both shots above were captured from the running build;
+the second is a demo state, and the connected screen below is against a real
+server.
+
+### PS Vita — 960x544  *(layout preview; build not yet compiled)*
 
 ![Vita](docs/previews/vita.png)
 
-### Nintendo 3DS — 400x240 over 320x240
+### Nintendo 3DS — 400x240 over 320x240  *(handheld interface)*
 
 | in a match | the menu |
 |---|---|
 | ![3DS](docs/previews/3ds.png) | ![3DS menu](docs/previews/3ds_menu.png) |
 
-**How these were made, and what they are not.** The PC shot is a real capture
+**How these were made, and what they are not.** The PC shots are real captures
 from the SDL3 build. The Vita and 3DS images are the *same build* rendering at
 those layouts — honest about arrangement, scale and every pixel of the
 interface, because the layout rule is shared between backends and the Vita
@@ -66,9 +79,20 @@ make -C pc        # pc/pong-pc         (SDL3)
 make -C vita      # vita/pong-vita.vpk (VitaSDK)
 ```
 
-`make -C pc run` opens a window. `--size WxH` renders another platform's
-layout, `--play` shows a match rather than the menu, and `--shot file.bmp`
-captures a frame and exits, which is how the previews above were produced.
+`make -C pc run` opens a window.
+
+| flag | |
+|---|---|
+| `--size WxH` | window size |
+| `--autoplay` | join a quick match straight away |
+| `--demo` | fill in a match state without a server, for screenshots |
+| `--frames N --shot f.bmp` | render N frames, save one, exit |
+
+The PC build reads `pong-pc.cfg` beside the binary (`server`, `port`, `name`),
+and SERVER and NAME are editable in the menu. **It speaks raw TCP only**, so it
+plays against a server on the LAN and not through the Cloudflare tunnel -- to
+play over the internet from a desktop, open the web client, which already does
+that properly.
 
 **Honest status.** The 3DS and PC builds are compiled and run here; the PC one
 was rendered and inspected. **The Vita build has never been compiled** -- there

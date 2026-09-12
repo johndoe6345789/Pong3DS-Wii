@@ -38,8 +38,17 @@ static inline PongColor pong_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 }
 
 typedef enum {
-    PONG_SURFACE_TOP = 0,    /* 400x240 -- the playfield */
-    PONG_SURFACE_BOTTOM,     /* 320x240 -- menu, status, touch */
+    PONG_SURFACE_TOP = 0,    /* 400x240 -- the handheld playfield */
+    PONG_SURFACE_BOTTOM,     /* 320x240 -- handheld menu, status, touch */
+    /*
+     * The whole output, in real pixels.
+     *
+     * For platforms whose interface is not a pair of handheld screens. A
+     * desktop window is not a 3DS and should not pretend to be one, any more
+     * than the browser client does -- it gets one canvas and lays itself out
+     * for the space it actually has. Use pong_gfx_output_size() for the extent.
+     */
+    PONG_SURFACE_FULL,
     PONG_SURFACE_COUNT
 } PongSurface;
 
@@ -68,6 +77,9 @@ bool pong_gfx_init(const char *title);
  * rule is shared and therefore genuinely previewable.
  */
 void pong_gfx_request_size(int w, int h);
+
+/** Real pixel extent of the output, for PONG_SURFACE_FULL layout. */
+void pong_gfx_output_size(int *w, int *h);
 void pong_gfx_exit(void);
 
 /** One frame, both surfaces. Draw between these. */
