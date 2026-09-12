@@ -62,7 +62,7 @@ typedef struct {
 
     char status[96];
     char detail[96];
-    char message[192];   /* holds update-check messages, which are verbose */
+    char message[352];   /* holds update messages, which can carry a release URL */
     char addr[PONG_ADDR_MAX];
     char room[PONG_ROOM_CODE_BYTES + 1];
     int  menu_sel;
@@ -153,7 +153,10 @@ static void do_update_check(App *a)
     snprintf(a->message, sizeof a->message, "checking for updates...");
     pong_log_section("update check");
 
-    PongUpdateResult r = pong_update_check(&a->cfg.net, PONG_BUILD_ID, &up);
+    pong_log("source         : %s", pong_update_source_name(a->cfg.update_source));
+    PongUpdateResult r = pong_update_check(&a->cfg.net, PONG_BUILD_ID,
+                                           a->cfg.update_source,
+                                           a->cfg.gh_owner, a->cfg.gh_repo, &up);
     pong_log("local build    : %lu", (unsigned long)up.local_build);
     pong_log("remote build   : %lu", (unsigned long)up.remote_build);
     pong_log("result         : %s", up.message);
@@ -430,6 +433,9 @@ int main(void)
              app.cfg.net.lan_host[0] ? app.cfg.net.lan_host : "(unset)",
              (unsigned)app.cfg.net.lan_port, app.cfg.net.lan_subnet);
     pong_log("player name    : %s", app.cfg.player_name);
+    pong_log("update source  : %s (%s/%s)",
+             pong_update_source_name(app.cfg.update_source),
+             app.cfg.gh_owner, app.cfg.gh_repo);
 
     /* Sockets. The buffer must be page-aligned and becomes inaccessible to us
      * while SOC is up, so it is never freed before socExit(). */
@@ -490,6 +496,14 @@ int main(void)
                     if (ask_room_code(&app)) begin_connect(&app, PONG_JOIN_MODE_ROOM_CODE);
                     break;
                 case MENU_SERVER: edit_server_address(&app); break;
+                case MENU_SOURCE:
+                    app.cfg.update_source =
+                        (app.cfg.update_source == PONG_UPDATE_SRC_GITHUB)
+                            ? PONG_UPDATE_SRC_SERVER : PONG_UPDATE_SRC_GITHUB;
+                    pong_config_save(&app.cfg);
+                    snprintf(app.message, sizeof app.message, "updates from %s",
+                             pong_update_source_name(app.cfg.update_source));
+                    break;
                 case MENU_UPDATE: do_update_check(&app); break;
                 default: break;
                 }
@@ -542,6 +556,7 @@ int main(void)
         hud.build_id = PONG_BUILD_ID;
         /* Only meaningful while waiting in a room someone else must join. */
         hud.room_code = app.room[0] ? app.room : NULL;
+        hud.update_src = pong_update_source_name(app.cfg.update_source);
         hud.my_side = app.client.my_side;
         hud.slow_mode = app.client.slow_mode;
         hud.message = app.message;

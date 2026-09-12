@@ -47,3 +47,14 @@ name=3DS PLAYER
 
 # Check for a newer build on launch (0 disables).
 autoupdate=1
+
+# Where the UPDATE button looks. Toggle it from the menu (SOURCE) or here.
+#
+#   server  what the game server is running -- the build you can play against
+#   github  the newest published release, whatever any server is running
+#
+# GitHub is the better answer when a deploy is lagging behind CI, which is
+# otherwise invisible from the console.
+update_source=server
+gh_owner=johndoe6345789
+gh_repo=Pong3DS-Wii
