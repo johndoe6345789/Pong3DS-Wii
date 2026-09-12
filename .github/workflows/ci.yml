@@ -303,7 +303,7 @@ jobs:
             libasound2-dev libpulse-dev libx11-dev libxext-dev \
             libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
             libwayland-dev libxkbcommon-dev \
-            libxss-dev libxxf86vm-dev libdrm-dev libgbm-dev \
+            libxss-dev libxtst-dev libxxf86vm-dev libdrm-dev libgbm-dev \
             libudev-dev libibus-1.0-dev patchelf
 
       - name: Cache SDL3
@@ -466,13 +466,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: What the SDK actually provides
+        shell: bash
+        run: |
+          # The link failed on -lSceSharedFb_stub, which this SDK does not have
+          # under that name. Rather than guess again, list what is there: the
+          # answer is cheaper to read than to deduce, and vita2d is already in
+          # the image so the vdpm call it replaced was noise.
+          echo "--- stubs matching Fb / Shared ---"
+          ls "$VITASDK/arm-vita-eabi/lib/" | grep -iE "fb|shared" || echo "(none)"
+          echo "--- is vita2d present? ---"
+          ls -l "$VITASDK/arm-vita-eabi/lib/libvita2d.a" || echo "(missing)"
+
       - name: Build
         shell: bash        # the container defaults to dash, which has no pipefail
         run: |
           set -euo pipefail
           export PATH="$VITASDK/bin:$PATH"
-          # vita2d is not in the base image; it is the one dependency.
-          vdpm vita2d || true
           make -C vita
 
       - uses: actions/upload-artifact@v4
