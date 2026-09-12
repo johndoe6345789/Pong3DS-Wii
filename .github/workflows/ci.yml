@@ -281,9 +281,194 @@ jobs:
           if-no-files-found: error
 
 
+  # -------------------------------------------------------------- linux -----
+  #
+  # SDL3 is new enough that no LTS ships libsdl3-dev yet, so it is built from
+  # source and cached on its version. That is slow once and free afterwards,
+  # and it pins exactly what the binary links against rather than inheriting
+  # whatever a distro decides later.
+  linux:
+    name: Build Linux (SDL3)
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      SDL_VERSION: "3.2.8"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config \
+            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
+            libwayland-dev libxkbcommon-dev
+
+      - name: Cache SDL3
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/sdl3-install
+          key: sdl3-${{ env.SDL_VERSION }}-${{ runner.os }}
+
+      - name: Build SDL3
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "release-${SDL_VERSION}" \
+            https://github.com/libsdl-org/SDL.git /tmp/SDL
+          cmake -S /tmp/SDL -B /tmp/SDL/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-install"
+          cmake --build /tmp/SDL/build
+          cmake --install /tmp/SDL/build
+
+      - name: Build
+        run: |
+          export PKG_CONFIG_PATH="$HOME/sdl3-install/lib/pkgconfig:$HOME/sdl3-install/lib64/pkgconfig"
+          make -C pc
+
+      - name: Bundle SDL3 alongside the binary
+        run: |
+          set -euo pipefail
+          # Same reasoning as the Mac job: the binary links a library that lives
+          # in a path unique to this runner. It is copied in and found through
+          # an rpath relative to the executable, so the tarball runs on a
+          # machine that has never heard of SDL3.
+          STAGE=pong-pc-linux-x86_64
+          mkdir -p "$STAGE"
+          cp pc/pong-pc "$STAGE/"
+          cp -L "$HOME"/sdl3-install/lib*/libSDL3.so* "$STAGE/" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "$STAGE/pong-pc" 2>/dev/null || \
+            (sudo apt-get install -y patchelf && patchelf --set-rpath '$ORIGIN' "$STAGE/pong-pc")
+          ldd "$STAGE/pong-pc" || true
+
+          cat > "$STAGE/README.txt" <<'EOF'
+          Pong - desktop build (Linux x86_64)
+
+            ./pong-pc
+
+          SDL3 is bundled beside the binary and found through an rpath, so
+          nothing needs installing.
+
+          Settings live in pong-pc.cfg beside the binary; SERVER and NAME are
+          editable from the menu. This build speaks raw TCP to a server on your
+          network -- for internet play, open the web client.
+
+          Controls: arrows or W/S, mouse, or a gamepad. Enter selects, Esc back.
+          EOF
+
+          tar czf "$STAGE.tar.gz" "$STAGE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: pong-pc-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  # ------------------------------------------------------------ windows -----
+  #
+  # MSYS2/MinGW rather than MSVC: net_pc.c is written against BSD sockets with
+  # a Winsock branch, and the rest of the tree is plain C99 with a POSIX
+  # flavour. MinGW takes it as-is; MSVC would mean a second build system for
+  # no gain.
+  windows:
+    name: Build Windows (SDL3)
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-SDL3
+            zip
+
+      - name: Build
+        run: make -C pc
+
+      - name: Bundle the runtime DLLs
+        run: |
+          set -euo pipefail
+          # A MinGW binary needs its own runtime DLLs as well as SDL3, and
+          # "the exe does nothing when double-clicked" is what happens when
+          # they are missing. Copied from what the linker actually recorded
+          # rather than from a guessed list.
+          STAGE=pong-pc-windows-x86_64
+          mkdir -p "$STAGE"
+          cp pc/pong-pc.exe "$STAGE/"
+
+          for dll in $(ldd pc/pong-pc.exe | awk '/ucrt64/ {print $3}'); do
+            cp -v "$dll" "$STAGE/"
+          done
+
+          cat > "$STAGE/README.txt" <<'EOF'
+          Pong - desktop build (Windows x86_64)
+
+            pong-pc.exe
+
+          Everything it needs is in this folder; keep the DLLs beside the exe.
+
+          Settings live in pong-pc.cfg beside the exe; SERVER and NAME are
+          editable from the menu. This build speaks raw TCP to a server on your
+          network -- for internet play, open the web client.
+
+          Controls: arrows or W/S, mouse, or a gamepad (a DualSense works
+          as-is). Enter selects, Esc back.
+          EOF
+
+          zip -r "$STAGE.zip" "$STAGE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: pong-pc-windows-x86_64.zip
+          if-no-files-found: error
+
+  # --------------------------------------------------------------- vita -----
+  #
+  # THIS HAS NEVER BUILT. The Vita backend was written without a VitaSDK to
+  # hand, so this job exists to find out what is wrong with it -- which is the
+  # fastest way to get from "carefully written" to "actually compiles".
+  #
+  # continue-on-error so a broken Vita build does not hold up a release of the
+  # four that do work. Remove it once this has gone green.
+  vita:
+    name: Build Vita (vita2d)
+    needs: verify
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    container: vitasdk/vitasdk:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          export PATH="$VITASDK/bin:$PATH"
+          # vita2d is not in the base image; it is the one dependency.
+          vdpm vita2d || true
+          make -C vita
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vita-build
+          path: vita/pong-vita.vpk
+          if-no-files-found: warn
+
+
   cia:
     name: Build 3DS (.3dsx + .cia)
-    needs: [verify, mac]
+    needs: [verify, mac, linux, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write      # required to create releases
@@ -341,10 +526,11 @@ jobs:
             3ds/pong3ds.cia
           retention-days: 30
 
-      - name: Fetch the Mac build
+      - name: Fetch the desktop builds
         uses: actions/download-artifact@v4
         with:
-          name: mac-build
+          pattern: "*-build"
+          merge-multiple: true
 
       - name: Publish release
         if: github.event_name != 'pull_request'
@@ -375,7 +561,9 @@ jobs:
             printf '| file | platform | install |\n|---|---|---|\n'
             printf '| `pong3ds.cia` | 3DS | Install with FBI. Own HOME-menu title. |\n'
             printf '| `pong3ds.3dsx` | 3DS | Copy to `sd:/3ds/`, launch from the Homebrew Launcher. |\n'
-            printf '| `pong-pc-macos-arm64.zip` | macOS (Apple silicon) | Unzip and run `./pong-pc`. SDL3 is bundled. |\n\n'
+            printf '| `pong-pc-macos-arm64.zip` | macOS (Apple silicon) | Unzip, run `./pong-pc`. SDL3 bundled. |\n'
+            printf '| `pong-pc-windows-x86_64.zip` | Windows | Unzip, run `pong-pc.exe`. DLLs included. |\n'
+            printf '| `pong-pc-linux-x86_64.tar.gz` | Linux | Extract, run `./pong-pc`. SDL3 bundled. |\n\n'
             printf 'The Mac build speaks **raw TCP only** -- it plays against a server on your\n'
             printf 'network, not through the tunnel. For internet play from a desktop, open the\n'
             printf 'web client. Keyboard, mouse or a gamepad; a DualSense works as-is.\n\n'
@@ -398,7 +586,9 @@ jobs:
             $PRERELEASE \
             3ds/pong3ds.cia \
             3ds/pong3ds.3dsx \
-            pong-pc-macos-arm64.zip
+            pong-pc-macos-arm64.zip \
+            pong-pc-windows-x86_64.zip \
+            pong-pc-linux-x86_64.tar.gz
 
           printf '### Released\n\n[%s](%s)\n' "$TAG" \
             "https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
