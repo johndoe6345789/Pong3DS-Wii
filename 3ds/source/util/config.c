@@ -87,10 +87,10 @@ void pong_config_load(PongConfig *cfg)
     cfg->net.mode = PONG_MODE_AUTO;
     snprintf(cfg->player_name, sizeof cfg->player_name, "3DS PLAYER");
     cfg->autoupdate = true;
-    /* Defaults to the server: it reports the build that server is actually
-     * running, which is the one you can play against. GitHub reports the newest
-     * published build, which is the better answer when a deploy is lagging. */
-    cfg->update_source = PONG_UPDATE_SRC_SERVER;
+    /* Defaults to the upstream repository's releases: independent of whether
+     * any particular server has been redeployed, which is the gap the server
+     * source cannot see. Cycle the SOURCE row to pick a different one. */
+    cfg->update_source = PONG_UPDATE_SRC_GITHUB;
     snprintf(cfg->gh_owner, sizeof cfg->gh_owner, "%s", PONG_GH_OWNER);
     snprintf(cfg->gh_repo, sizeof cfg->gh_repo, "%s", PONG_GH_REPO);
 

@@ -33,11 +33,6 @@
 #define DOWNLOAD_MAX (2 * 1024 * 1024)   /* the .3dsx is ~420KB; 2MB is slack */
 #define GH_JSON_MAX  (24 * 1024)
 
-const char *pong_update_source_name(PongUpdateSource s)
-{
-    return s == PONG_UPDATE_SRC_GITHUB ? "GitHub Releases" : "game server";
-}
-
 /* Checks GitHub Releases directly, so an un-redeployed server cannot hide a
  * newer build. */
 static PongUpdateResult check_github(const PongNetConfig *net, uint32_t local_build,
@@ -68,7 +63,11 @@ static PongUpdateResult check_github(const PongNetConfig *net, uint32_t local_bu
 
     char tag[64];
     if (!pong_gh_first_tag((const char *)body, tag, sizeof tag)) {
-        snprintf(out->message, sizeof out->message, "no releases found");
+        /* An empty repository is a normal state, not a fault -- say so, and say
+         * what to do, rather than reporting it like a network error. */
+        snprintf(out->message, sizeof out->message,
+                 "%s/%s has no releases yet - press SOURCE to pick another",
+                 owner, repo);
         return PONG_UPDATE_ERROR;
     }
 

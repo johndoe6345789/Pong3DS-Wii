@@ -45,9 +45,37 @@ typedef enum {
     PONG_UPDATE_SRC_GITHUB,      /* the repository's Releases */
 } PongUpdateSource;
 
-/* Repository the GitHub source reads. Overridable from the SD config. */
-#define PONG_GH_OWNER "johndoe6345789"
+/*
+ * Where updates can come from, in the order the SOURCE row cycles through.
+ *
+ * The upstream repository is the default: it is where this project is intended
+ * to live, and pointing the shipped default at a personal fork would mean every
+ * console quietly tracking one contributor's branch. The fork stays available
+ * as an explicit choice, which is what you want while the upstream is still
+ * catching up.
+ *
+ * Any owner/repo can be set in sdmc:/3ds/pong3ds.cfg without rebuilding; the
+ * presets are the ones reachable from the menu.
+ */
+#define PONG_GH_OWNER "josheeb0"
 #define PONG_GH_REPO  "Pong3DS-Wii"
+
+typedef struct {
+    PongUpdateSource source;
+    const char *owner;   /* NULL for the server source */
+    const char *repo;
+    const char *label;   /* shown on the menu */
+} PongUpdateTarget;
+
+extern const PongUpdateTarget PONG_UPDATE_TARGETS[];
+extern const int PONG_UPDATE_TARGET_COUNT;
+
+/**
+ * Index of the preset matching this configuration, or -1 for a custom
+ * owner/repo set by hand in the config file -- which the menu must not silently
+ * overwrite.
+ */
+int pong_update_target_index(PongUpdateSource src, const char *owner, const char *repo);
 
 typedef enum {
     PONG_UPDATE_CURRENT = 0,   /* already newest */
@@ -88,7 +116,9 @@ PongUpdateResult pong_update_download(const PongNetConfig *net,
                                       const char *dest_path,
                                       char *message, size_t message_cap);
 
-/** Human name for the source, for the settings row. */
+/** Human name for the current target, for the settings row and the footer. */
 const char *pong_update_source_name(PongUpdateSource s);
+const char *pong_update_target_label(PongUpdateSource src, const char *owner,
+                                     const char *repo, char *buf, size_t cap);
 
 #endif /* PONG_UPDATE_H */

@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../source/util/ghparse.h"
+#include "../source/util/update.h"
 
 static int fails = 0;
 
@@ -97,8 +98,61 @@ int main(void)
     build_is("", 0);
     build_is(NULL, 0);
 
+    printf("\n=== update target presets ===\n");
+    {
+        /* The upstream must be first: it is the shipped default, and a default
+         * pointing at a personal fork would have every console tracking one
+         * contributor. */
+        const PongUpdateTarget *first = &PONG_UPDATE_TARGETS[0];
+        if (first->source != PONG_UPDATE_SRC_GITHUB ||
+            strcmp(first->owner, "josheeb0") != 0) {
+            printf("  FAIL first preset is %s, expected GitHub josheeb0\n", first->label);
+            fails++;
+        } else {
+            printf("  ok   first preset is the upstream (%s)\n", first->label);
+        }
+
+        /* Every preset must be findable, or cycling would skip entries. */
+        for (int i = 0; i < PONG_UPDATE_TARGET_COUNT; i++) {
+            const PongUpdateTarget *t = &PONG_UPDATE_TARGETS[i];
+            int idx = pong_update_target_index(t->source, t->owner, t->repo);
+            if (idx != i) {
+                printf("  FAIL preset %d (%s) resolved to %d\n", i, t->label, idx);
+                fails++;
+            }
+        }
+        printf("  ok   all %d presets resolve to themselves\n", PONG_UPDATE_TARGET_COUNT);
+
+        /* A hand-edited config matching no preset must report -1, so the menu
+         * starts the cycle from the top rather than rewriting it to a neighbour. */
+        int custom = pong_update_target_index(PONG_UPDATE_SRC_GITHUB, "someone", "else");
+        if (custom != -1) { printf("  FAIL custom repo resolved to %d\n", custom); fails++; }
+        else printf("  ok   a custom owner/repo is not mistaken for a preset\n");
+
+        /* Cycling must visit every preset exactly once before repeating. */
+        int seen[8] = {0};
+        int idx = 0;
+        for (int n = 0; n < PONG_UPDATE_TARGET_COUNT; n++) {
+            seen[idx]++;
+            idx = (idx + 1) % PONG_UPDATE_TARGET_COUNT;
+        }
+        int bad = 0;
+        for (int i = 0; i < PONG_UPDATE_TARGET_COUNT; i++) if (seen[i] != 1) bad++;
+        if (bad) { printf("  FAIL cycling visited %d preset(s) wrongly\n", bad); fails++; }
+        else printf("  ok   cycling visits each preset exactly once\n");
+
+        char buf[80];
+        pong_update_target_label(PONG_UPDATE_SRC_GITHUB, "someone", "else", buf, sizeof buf);
+        if (strstr(buf, "someone/else") == NULL) {
+            printf("  FAIL custom label was '%s', expected the owner/repo\n", buf);
+            fails++;
+        } else {
+            printf("  ok   a custom target names itself: %s\n", buf);
+        }
+    }
+
     printf("\n");
     if (fails) { printf("FAILED: %d check(s)\n", fails); return 1; }
-    printf("PASSED: GitHub release parsing\n");
+    printf("PASSED: GitHub release parsing and update targets\n");
     return 0;
 }
