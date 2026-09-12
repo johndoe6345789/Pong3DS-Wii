@@ -215,9 +215,75 @@ jobs:
   #
   # Both halves were reproduced locally in Docker before being written here.
   # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------- mac -----
+  #
+  # The desktop build, on a real macOS runner because a Mac binary cannot be
+  # cross-compiled from Linux. Runs on Apple silicon (macos-14+ is arm64), so
+  # the artifact is named for what it actually is rather than "mac".
+  mac:
+    name: Build Mac (SDL3)
+    needs: verify
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL3
+        run: brew install sdl3
+
+      - name: Build
+        run: make -C pc
+
+      - name: Bundle SDL3 alongside the binary
+        run: |
+          set -euo pipefail
+          # A bare binary links against Homebrew's dylib at an absolute path
+          # that exists on this runner and on nobody else's machine. Copying the
+          # library in and rewriting the load path means the zip runs without
+          # the person downloading it having to install anything.
+          STAGE=pong-pc-macos-arm64
+          mkdir -p "$STAGE"
+          cp pc/pong-pc "$STAGE/"
+
+          SDL=$(otool -L pc/pong-pc | awk '/libSDL3/ {print $1; exit}')
+          echo "linked against: $SDL"
+          cp "$SDL" "$STAGE/"
+          SDL_BASE=$(basename "$SDL")
+
+          install_name_tool -change "$SDL" "@executable_path/$SDL_BASE" "$STAGE/pong-pc"
+          otool -L "$STAGE/pong-pc"
+
+          cat > "$STAGE/README.txt" <<'EOF'
+          Pong - desktop build (macOS, Apple silicon)
+
+            ./pong-pc
+
+          macOS will refuse an unsigned download the first time. Either
+          right-click the binary and choose Open, or run:
+
+            xattr -d com.apple.quarantine pong-pc libSDL3.0.dylib
+
+          Settings live in pong-pc.cfg beside the binary, and SERVER and NAME
+          are editable from the menu.
+
+          This build speaks raw TCP to a server on your network. It does not do
+          HTTPS -- to play over the internet, open the web client instead.
+
+          Controls: arrows or W/S, mouse, or a gamepad (a DualSense works as-is).
+          Enter selects, Esc goes back.
+          EOF
+
+          zip -r "$STAGE.zip" "$STAGE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: pong-pc-macos-arm64.zip
+          if-no-files-found: error
+
+
   cia:
     name: Build 3DS (.3dsx + .cia)
-    needs: verify
+    needs: [verify, mac]
     runs-on: ubuntu-latest
     permissions:
       contents: write      # required to create releases
@@ -275,6 +341,11 @@ jobs:
             3ds/pong3ds.cia
           retention-days: 30
 
+      - name: Fetch the Mac build
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-build
+
       - name: Publish release
         if: github.event_name != 'pull_request'
         env:
@@ -299,10 +370,15 @@ jobs:
           # Notes are written to a file rather than passed inline, so nothing
           # from the commit can be interpreted as shell.
           {
-            printf '3DS client, build %s (`%s`).\n\n' "$BUILD_NUM" "${SHA:0:7}"
-            printf '| file | install |\n|---|---|\n'
-            printf '| `pong3ds.cia` | Install with FBI. Own HOME-menu title, 64MB mode. |\n'
-            printf '| `pong3ds.3dsx` | Copy to `sd:/3ds/`, launch from the Homebrew Launcher. |\n\n'
+            printf 'Build %s (`%s`). One game, one protocol, an interface per platform.\n\n' \
+              "$BUILD_NUM" "${SHA:0:7}"
+            printf '| file | platform | install |\n|---|---|---|\n'
+            printf '| `pong3ds.cia` | 3DS | Install with FBI. Own HOME-menu title. |\n'
+            printf '| `pong3ds.3dsx` | 3DS | Copy to `sd:/3ds/`, launch from the Homebrew Launcher. |\n'
+            printf '| `pong-pc-macos-arm64.zip` | macOS (Apple silicon) | Unzip and run `./pong-pc`. SDL3 is bundled. |\n\n'
+            printf 'The Mac build speaks **raw TCP only** -- it plays against a server on your\n'
+            printf 'network, not through the tunnel. For internet play from a desktop, open the\n'
+            printf 'web client. Keyboard, mouse or a gamepad; a DualSense works as-is.\n\n'
             printf 'Tap the server field on the title screen to enter an address:\n\n'
             printf -- '- `pong.wardcrew.com` - HTTPS on 443 (works anywhere)\n'
             printf -- '- `192.168.4.29:8788` - plain HTTP on a LAN\n'
@@ -321,7 +397,8 @@ jobs:
             --notes-file /tmp/notes.md \
             $PRERELEASE \
             3ds/pong3ds.cia \
-            3ds/pong3ds.3dsx
+            3ds/pong3ds.3dsx \
+            pong-pc-macos-arm64.zip
 
           printf '### Released\n\n[%s](%s)\n' "$TAG" \
             "https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
