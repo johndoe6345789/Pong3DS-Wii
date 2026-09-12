@@ -302,7 +302,9 @@ jobs:
           sudo apt-get install -y cmake ninja-build pkg-config \
             libasound2-dev libpulse-dev libx11-dev libxext-dev \
             libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
-            libwayland-dev libxkbcommon-dev
+            libwayland-dev libxkbcommon-dev \
+            libxss-dev libxxf86vm-dev libdrm-dev libgbm-dev \
+            libudev-dev libibus-1.0-dev patchelf
 
       - name: Cache SDL3
         id: sdl-cache
@@ -317,8 +319,13 @@ jobs:
           set -euo pipefail
           git clone --depth 1 --branch "release-${SDL_VERSION}" \
             https://github.com/libsdl-org/SDL.git /tmp/SDL
+          # X11 extras are optional for a game window; turning the ones we do
+          # not use off is more robust than chasing every -dev package a full
+          # SDL build would like to have.
           cmake -S /tmp/SDL -B /tmp/SDL/build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_X11_XSCRNSAVER=OFF \
+            -DSDL_X11_XDBE=OFF \
             -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-install"
           cmake --build /tmp/SDL/build
           cmake --install /tmp/SDL/build
