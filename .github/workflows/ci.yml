@@ -292,7 +292,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     env:
-      SDL_VERSION: "3.2.8"
+      SDL_VERSION: "3.4.16"
     steps:
       - uses: actions/checkout@v4
 
@@ -368,55 +368,64 @@ jobs:
 
   # ------------------------------------------------------------ windows -----
   #
-  # MSYS2/MinGW rather than MSVC: net_pc.c is written against BSD sockets with
-  # a Winsock branch, and the rest of the tree is plain C99 with a POSIX
-  # flavour. MinGW takes it as-is; MSVC would mean a second build system for
-  # no gain.
+  # MSVC and native Winsock. net_pc.c already branches on _WIN32 for the socket
+  # differences, so the compiler choice costs nothing above that layer -- and
+  # an MSVC binary needs no MinGW runtime beside it, only SDL3.dll.
+  #
+  # Built by invoking cl directly rather than adding CMake: six source files
+  # and two libraries do not need a build system, and the one that exists for
+  # the other platforms is a Makefile MSVC cannot read.
   windows:
-    name: Build Windows (SDL3)
+    name: Build Windows (MSVC)
     needs: verify
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
+    env:
+      SDL_VERSION: "3.4.16"
     steps:
       - uses: actions/checkout@v4
 
-      - uses: msys2/setup-msys2@v2
+      - uses: ilammy/msvc-dev-cmd@v1
         with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            make
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-pkg-config
-            mingw-w64-ucrt-x86_64-SDL3
-            zip
+          arch: x64
+
+      - name: Fetch the SDL3 VC package
+        shell: pwsh
+        run: |
+          $url = "https://github.com/libsdl-org/SDL/releases/download/release-$env:SDL_VERSION/SDL3-devel-$env:SDL_VERSION-VC.zip"
+          Write-Host "downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile sdl3.zip
+          Expand-Archive -Path sdl3.zip -DestinationPath sdl3 -Force
+          Get-ChildItem sdl3
 
       - name: Build
-        run: make -C pc
-
-      - name: Bundle the runtime DLLs
+        shell: cmd
         run: |
-          set -euo pipefail
-          # A MinGW binary needs its own runtime DLLs as well as SDL3, and
-          # "the exe does nothing when double-clicked" is what happens when
-          # they are missing. Copied from what the linker actually recorded
-          # rather than from a guessed list.
-          STAGE=pong-pc-windows-x86_64
-          mkdir -p "$STAGE"
-          cp pc/pong-pc.exe "$STAGE/"
+          set SDLDIR=sdl3\SDL3-%SDL_VERSION%
+          cl /nologo /std:c11 /O2 /W3 /D_CRT_SECURE_NO_WARNINGS ^
+             /Ipc /Isrc\gfx /Isrc\ui /I3ds\source\game /I3ds\source\net ^
+             /I%SDLDIR%\include ^
+             pc\main_sdl.c pc\net_pc.c ^
+             src\gfx\sdl3\gfx_sdl3.c src\ui\desktop.c ^
+             3ds\source\net\pong_proto.c 3ds\source\game\client.c ^
+             /Fe:pong-pc.exe ^
+             /link /LIBPATH:%SDLDIR%\lib\x64 SDL3.lib ws2_32.lib
+          if errorlevel 1 exit /b 1
 
-          for dll in $(ldd pc/pong-pc.exe | awk '/ucrt64/ {print $3}'); do
-            cp -v "$dll" "$STAGE/"
-          done
-
-          cat > "$STAGE/README.txt" <<'EOF'
-          Pong - desktop build (Windows x86_64)
+      - name: Bundle
+        shell: pwsh
+        run: |
+          $stage = "pong-pc-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item pong-pc.exe $stage
+          # SDL3.dll is the only runtime dependency an MSVC build has beyond
+          # what Windows itself ships.
+          Copy-Item "sdl3\SDL3-$env:SDL_VERSION\lib\x64\SDL3.dll" $stage
+          @"
+          Pong - desktop build (Windows x64)
 
             pong-pc.exe
 
-          Everything it needs is in this folder; keep the DLLs beside the exe.
+          Keep SDL3.dll beside the exe.
 
           Settings live in pong-pc.cfg beside the exe; SERVER and NAME are
           editable from the menu. This build speaks raw TCP to a server on your
@@ -424,9 +433,8 @@ jobs:
 
           Controls: arrows or W/S, mouse, or a gamepad (a DualSense works
           as-is). Enter selects, Esc back.
-          EOF
-
-          zip -r "$STAGE.zip" "$STAGE"
+          "@ | Set-Content "$stage\README.txt"
+          Compress-Archive -Path $stage -DestinationPath "$stage.zip" -Force
 
       - uses: actions/upload-artifact@v4
         with:
@@ -452,6 +460,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build
+        shell: bash        # the container defaults to dash, which has no pipefail
         run: |
           set -euo pipefail
           export PATH="$VITASDK/bin:$PATH"

@@ -1,3 +1,17 @@
+/*
+ * getaddrinfo and struct addrinfo are POSIX, not ISO C, and glibc hides them
+ * under -std=c99 unless asked. macOS's headers expose them anyway, so this
+ * built there and failed on Linux with "storage size of 'hints' isn't known".
+ * Declared here rather than as a compiler flag, so the requirement travels
+ * with the file that has it.
+ */
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+  #define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__)
+  #define _DARWIN_C_SOURCE          /* macOS hides some of it the other way */
+#endif
+
 #include "net_pc.h"
 
 #include <stdio.h>
