@@ -13,13 +13,13 @@ CC       := arm-vita-eabi-gcc
 CFLAGS   := -std=c99 -Wall -Wextra -O2 -fno-lto \
             -I$(ROOT)/src/gfx -I$(ROOT)/src/ui \
             -I$(ROOT)/3ds/source/game -I$(ROOT)/3ds/source/net
-# SceSharedFb is what vita2d uses to share the framebuffer with the system,
-# and leaving it out is the one thing that got past a clean compile: every
-# source file built, and the link failed on sceSharedFbBegin/End/Close. Found
-# by CI, which is exactly why the job exists.
+# No SceSharedFb here. The vitasdk image's prebuilt libvita2d.a wants it and
+# the image provides no such stub -- the two disagree. CI builds vita2d from
+# source against the stubs that are actually installed, which removes the
+# reference rather than trying to satisfy it.
 LIBS     := -lvita2d -lSceDisplay_stub -lSceGxm_stub -lSceSysmodule_stub \
             -lSceCtrl_stub -lSceTouch_stub -lSceCommonDialog_stub \
-            -lSceSharedFb_stub -lSceAppMgr_stub \
+            -lSceAppMgr_stub \
             -lSceNet_stub -lSceNetCtl_stub -lm
 
 SRC := main_vita.c \

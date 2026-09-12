@@ -466,17 +466,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: What the SDK actually provides
+      # The image ships a prebuilt libvita2d.a that references sceSharedFbBegin,
+      # End and Close -- and no SceSharedFb stub, as listing the stub directory
+      # showed: nothing there matches Fb or Shared at all. The library and the
+      # stub set in this image disagree with each other, which is not something
+      # a link line can fix.
+      #
+      # Building vita2d from source against the stubs that ARE installed
+      # resolves it by construction, and takes about a minute.
+      - name: Build vita2d from source
         shell: bash
         run: |
-          # The link failed on -lSceSharedFb_stub, which this SDK does not have
-          # under that name. Rather than guess again, list what is there: the
-          # answer is cheaper to read than to deduce, and vita2d is already in
-          # the image so the vdpm call it replaced was noise.
-          echo "--- stubs matching Fb / Shared ---"
-          ls "$VITASDK/arm-vita-eabi/lib/" | grep -iE "fb|shared" || echo "(none)"
-          echo "--- is vita2d present? ---"
-          ls -l "$VITASDK/arm-vita-eabi/lib/libvita2d.a" || echo "(missing)"
+          set -euo pipefail
+          export PATH="$VITASDK/bin:$PATH"
+          git clone --depth 1 https://github.com/xerpi/libvita2d.git /tmp/vita2d
+          make -C /tmp/vita2d/libvita2d install
 
       - name: Build
         shell: bash        # the container defaults to dash, which has no pipefail
