@@ -480,6 +480,20 @@ jobs:
           set -euo pipefail
           export PATH="$VITASDK/bin:$PATH"
           git clone --depth 1 https://github.com/xerpi/libvita2d.git /tmp/vita2d
+
+          # libvita2d's JPEG loader calls ceil() without including <math.h>.
+          # Older compilers accepted the implicit declaration; the GCC in this
+          # image rejects it, so the library will not build as published.
+          #
+          # Patched here rather than worked around with -Wno-implicit-function
+          # -declaration, because that flag would hide the same class of error
+          # in every other file too. We never call the JPEG loader -- the build
+          # simply compiles it.
+          if ! grep -q "math.h" /tmp/vita2d/libvita2d/source/vita2d_image_jpeg.c; then
+            sed -i '1i #include <math.h>' /tmp/vita2d/libvita2d/source/vita2d_image_jpeg.c
+            echo "patched vita2d_image_jpeg.c with <math.h>"
+          fi
+
           make -C /tmp/vita2d/libvita2d install
 
       - name: Build
