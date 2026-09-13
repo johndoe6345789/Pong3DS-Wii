@@ -506,7 +506,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: vita-build
-          path: vita/pong-vita.vpk
+          # The .elf goes up with the .vpk because the .vpk is stripped, and a
+          # Vita crash dump is a list of addresses with nothing to map them to.
+          # The first crash cost a round trip purely because the symbols had
+          # been thrown away at the point they became useful.
+          path: |
+            vita/pong-vita.vpk
+            vita/pong-vita-debug.elf
           if-no-files-found: warn
 
 

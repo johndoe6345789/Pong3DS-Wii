@@ -33,7 +33,12 @@ all: $(TARGET).vpk
 $(TARGET).elf: $(SRC)
 	$(CC) $(CFLAGS) -o $@ $(SRC) $(LIBS)
 
+# The symbols are copied aside BEFORE stripping. vita-elf-create needs a
+# stripped input, and strip works in place -- so without this the only build
+# that exists is the one that cannot be read, which is exactly the state the
+# first crash dump arrived in.
 $(TARGET).velf: $(TARGET).elf
+	cp $< $(TARGET)-debug.elf
 	arm-vita-eabi-strip -g $<
 	vita-elf-create $< $@
 
@@ -47,6 +52,6 @@ $(TARGET).vpk: eboot.bin param.sfo
 	vita-pack-vpk -s param.sfo -b eboot.bin $@
 
 clean:
-	rm -f $(TARGET).elf $(TARGET).velf eboot.bin param.sfo $(TARGET).vpk
+	rm -f $(TARGET).elf $(TARGET)-debug.elf $(TARGET).velf eboot.bin param.sfo $(TARGET).vpk
 
 .PHONY: all clean
