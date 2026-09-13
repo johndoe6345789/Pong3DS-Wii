@@ -10,6 +10,18 @@ TITLE    := PONG3DSV1
 ROOT     := ..
 
 CC       := arm-vita-eabi-gcc
+# -Wl,-q is not optional on this platform.
+#
+# It keeps the relocation entries in the ELF, and vita-elf-create REQUIRES them
+# to produce a loadable module. Without it everything still compiles, links and
+# packages into a .vpk that installs -- and then loads unrelocated, so every
+# absolute address is wrong and the first write to a global data-aborts.
+#
+# That is what three hardware crashes were: _init_vita_heap faulting on a store
+# to its own globals before main() ran. vita2d's own Makefile passes this flag
+# on every line; mine did not, and nothing along the way said so.
+LDFLAGS  := -Wl,-q
+
 CFLAGS   := -std=c99 -Wall -Wextra -O2 -fno-lto \
             -I$(ROOT)/src/gfx -I$(ROOT)/src/ui \
             -I$(ROOT)/3ds/source/game -I$(ROOT)/3ds/source/net
@@ -49,7 +61,7 @@ all: $(TARGET).vpk hello.vpk
 # A minimal vita2d app sharing this Makefile's toolchain and libraries, so a
 # failure here is the platform and a failure only in the game is the game.
 hello.elf: hello.c
-	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
 hello.velf: hello.elf
 	arm-vita-eabi-strip -g $<
@@ -65,7 +77,7 @@ hello.vpk: hello-eboot.bin hello-param.sfo
 	vita-pack-vpk -s hello-param.sfo -b hello-eboot.bin $@
 
 $(TARGET).elf: $(SRC)
-	$(CC) $(CFLAGS) -o $@ $(SRC) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRC) $(LIBS)
 
 # The symbols are copied aside BEFORE stripping. vita-elf-create needs a
 # stripped input, and strip works in place -- so without this the only build
