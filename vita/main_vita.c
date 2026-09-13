@@ -311,6 +311,10 @@ static void open_editor(App *a, int item)
 
     if (pong_ime_open(title, initial, cap)) {
         a->editing = item;
+        /* The system composites the keyboard, but only if the backend gives it
+         * the chance each frame. Without this it never draws and the game
+         * looks frozen. */
+        pong_gfx_system_dialog(true);
     } else {
         snprintf(a->toast, sizeof a->toast, "keyboard unavailable");
     }
@@ -404,6 +408,7 @@ int main(void)
         if (app.editing >= 0) {
             char text[128];
             PongImeResult r = pong_ime_poll(text, sizeof text);
+            if (r != PONG_IME_PENDING) pong_gfx_system_dialog(false);
             if (r == PONG_IME_ACCEPTED)       commit_editor(&app, text);
             else if (r == PONG_IME_CANCELLED) app.editing = -1;
         } else {

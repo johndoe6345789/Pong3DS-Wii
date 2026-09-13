@@ -26,6 +26,7 @@
 
 #include <vita2d.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/common_dialog.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -158,9 +159,18 @@ void pong_gfx_frame_begin(void)
     vita2d_clear_screen();
 }
 
+static bool s_dialog = false;
+
+void pong_gfx_system_dialog(bool active) { s_dialog = active; }
+
 void pong_gfx_frame_end(void)
 {
     vita2d_end_drawing();
+    /* The IME is composited by the system, and only if it is given the chance
+     * every frame between drawing and the swap. Skip this and the keyboard
+     * never appears -- which reads as the application having frozen, because
+     * from the player's side it has. */
+    if (s_dialog) vita2d_common_dialog_update();
     vita2d_swap_buffers();
 }
 
