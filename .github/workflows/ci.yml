@@ -474,6 +474,14 @@ jobs:
       #
       # Building vita2d from source against the stubs that ARE installed
       # resolves it by construction, and takes about a minute.
+      - name: What the SDK provides
+        shell: bash
+        run: |
+          # Listed rather than guessed. Two stub names have been wrong already,
+          # and one CI run buys the real list outright.
+          echo "--- kernel-ish stubs ---"
+          ls "$VITASDK/arm-vita-eabi/lib/" | grep -iE "libSce(LibKernel|Iofilemgr|Sysmem|Processmgr|Thread|Rtc|Kernel)" || echo "(none)"
+
       - name: Build vita2d from source
         shell: bash
         run: |

@@ -25,13 +25,17 @@ CFLAGS   := -std=c99 -Wall -Wextra -O2 -fno-lto \
 # That is precisely what the first two hardware crashes were: identical stack
 # pointer and caller, a different garbage PC each run, and the first one landing
 # inside newlib's own reent_list. A missing library, not a missing check.
+#
+# No SceThreadmgr here: this SDK does not ship that stub, and thread management
+# comes through SceLibKernel. Checked by the linker rather than assumed, after
+# guessing a stub name wrong twice already.
 LIBS     := -lvita2d \
             -lSceDisplay_stub -lSceGxm_stub -lSceSysmodule_stub \
             -lSceCtrl_stub -lSceTouch_stub -lSceCommonDialog_stub \
             -lSceAppMgr_stub \
             -lSceNet_stub -lSceNetCtl_stub \
             -lSceLibKernel_stub -lSceIofilemgr_stub -lSceSysmem_stub \
-            -lSceProcessmgr_stub -lSceThreadmgr_stub -lSceRtc_stub \
+            -lSceProcessmgr_stub -lSceRtc_stub \
             -lm -lc
 
 SRC := main_vita.c \
