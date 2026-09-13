@@ -27,6 +27,7 @@
 #include <vita2d.h>
 #include <psp2/kernel/processmgr.h>
 #include <string.h>
+#include <stdio.h>
 
 #define VITA_W 960.0f
 #define VITA_H 544.0f
@@ -95,7 +96,11 @@ static bool build_font(void)
     if (!s_font) return false;
 
     unsigned int *px = (unsigned int *)vita2d_texture_get_datap(s_font);
+    if (!px) return false;          /* a texture can exist with no mapping */
+
     const unsigned int stride = vita2d_texture_get_stride(s_font) / 4;
+    if (stride < (unsigned)(n * 8)) return false;   /* would write past the row */
+
     memset(px, 0, (size_t)stride * 8 * 4);
 
     for (int g = 0; g < n; g++) {
@@ -111,13 +116,24 @@ static bool build_font(void)
     return true;
 }
 
+/* Written to by init so a failure says which step, not just "false". */
+char g_vita_gfx_error[96] = "";
+
 bool pong_gfx_init(const char *title)
 {
     (void)title;
     if (s_ready) return true;
+
     vita2d_init();
     vita2d_set_clear_color(RGBA8(0x10, 0x12, 0x16, 0xFF));
-    if (!build_font()) return false;
+
+    if (!build_font()) {
+        snprintf(g_vita_gfx_error, sizeof g_vita_gfx_error,
+                 "font atlas failed (texture %ux8)",
+                 (unsigned)((FONT8X8_LAST - FONT8X8_FIRST + 1) * 8));
+        return false;
+    }
+
     layout();
     s_ready = true;
     return true;
