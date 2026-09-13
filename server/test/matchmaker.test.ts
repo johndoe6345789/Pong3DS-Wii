@@ -73,6 +73,31 @@ describe('matchmaker', () => {
     expect(m.roomCount).toBe(1);
   });
 
+  it('pairs a same-platform arrival once the other has waited out the window', () => {
+    /*
+     * Why Mac vs Windows worked while Mac vs Linux did not, on the same build:
+     * it is entirely down to the gap between pressing QUICK MATCH on each
+     * machine. Walk to the other computer and eight seconds pass on their own,
+     * and the second arrival pairs immediately. Press them in quick succession
+     * and -- before the tick fix -- both waited forever.
+     *
+     * This half always worked, and is here so the explanation is checked
+     * rather than asserted.
+     */
+    const m = new Matchmaker();
+    const t = 1_000;
+
+    const mac = stubSession(Platform.PC, 'MAC');
+    const win = stubSession(Platform.PC, 'WINDOWS');
+
+    expect(m.join(asSession(mac), JoinMode.QUICKMATCH, '', t)).toBeNull();
+
+    // Ten seconds later, which is about how long it takes to cross a room.
+    const room = m.join(asSession(win), JoinMode.QUICKMATCH, '', t + 10_000);
+    expect(room).not.toBeNull();
+    expect(m.queueLength).toBe(0);
+  });
+
   it('still holds a same-platform pair back inside the window', () => {
     // The hold-back is the point: a 3DS arriving a moment later must still be
     // able to find a human rather than two browsers having taken each other.
