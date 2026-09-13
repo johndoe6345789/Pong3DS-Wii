@@ -521,6 +521,7 @@ jobs:
           path: |
             vita/pong-vita.vpk
             vita/pong-vita-debug.elf
+            vita/hello.vpk
           if-no-files-found: warn
 
 

@@ -44,7 +44,25 @@ SRC := main_vita.c \
        $(ROOT)/3ds/source/net/pong_proto.c \
        $(ROOT)/3ds/source/game/client.c
 
-all: $(TARGET).vpk
+all: $(TARGET).vpk hello.vpk
+
+# A minimal vita2d app sharing this Makefile's toolchain and libraries, so a
+# failure here is the platform and a failure only in the game is the game.
+hello.elf: hello.c
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+
+hello.velf: hello.elf
+	arm-vita-eabi-strip -g $<
+	vita-elf-create $< $@
+
+hello-eboot.bin: hello.velf
+	vita-make-fself -s $< $@
+
+hello-param.sfo:
+	vita-mksfoex -s TITLE_ID=PONGHELLO "Pong Vita Hello" $@
+
+hello.vpk: hello-eboot.bin hello-param.sfo
+	vita-pack-vpk -s hello-param.sfo -b hello-eboot.bin $@
 
 $(TARGET).elf: $(SRC)
 	$(CC) $(CFLAGS) -o $@ $(SRC) $(LIBS)
@@ -68,6 +86,7 @@ $(TARGET).vpk: eboot.bin param.sfo
 	vita-pack-vpk -s param.sfo -b eboot.bin $@
 
 clean:
-	rm -f $(TARGET).elf $(TARGET)-debug.elf $(TARGET).velf eboot.bin param.sfo $(TARGET).vpk
+	rm -f $(TARGET).elf $(TARGET)-debug.elf $(TARGET).velf eboot.bin param.sfo $(TARGET).vpk \
+	      hello.elf hello.velf hello-eboot.bin hello-param.sfo hello.vpk
 
 .PHONY: all clean
