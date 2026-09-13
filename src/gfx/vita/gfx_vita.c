@@ -56,6 +56,11 @@ static inline unsigned int v2d(PongColor c)
 
 static void layout(void)
 {
+    /* The whole screen, unscaled. The Vita has one display and an interface
+     * built for it should use all of it rather than pretending to be two
+     * handheld panels side by side. */
+    s_vp[PONG_SURFACE_FULL] = (Viewport){ 0.0f, 0.0f, VITA_W, VITA_H, 1.0f };
+
     const float gap = 8.0f;
 
     float side_w = PONG_TOP_W + gap + PONG_BOTTOM_W;
@@ -167,9 +172,8 @@ bool pong_gfx_text_input(bool enabled)
 
 void pong_gfx_output_size(int *w, int *h)
 {
-    /* The handheld UI never asks; reported for completeness. */
-    if (w) *w = (int)PONG_TOP_W;
-    if (h) *h = (int)PONG_TOP_H;
+    if (w) *w = (int)VITA_W;
+    if (h) *h = (int)VITA_H;
 }
 
 void pong_gfx_request_size(int w, int h)

@@ -23,7 +23,7 @@ CC       := arm-vita-eabi-gcc
 LDFLAGS  := -Wl,-q
 
 CFLAGS   := -std=c99 -Wall -Wextra -O2 -fno-lto \
-            -I$(ROOT)/src/gfx -I$(ROOT)/src/ui \
+            -I$(ROOT)/src/gfx -I$(ROOT)/src/ui -I$(ROOT)/pc \
             -I$(ROOT)/3ds/source/game -I$(ROOT)/3ds/source/net
 # No SceSharedFb here. The vitasdk image's prebuilt libvita2d.a wants it and
 # the image provides no such stub -- the two disagree. CI builds vita2d from
@@ -50,9 +50,11 @@ LIBS     := -lvita2d \
             -lSceProcessmgr_stub -lSceRtc_stub \
             -lm -lc
 
-SRC := main_vita.c \
+# The DESKTOP interface, not the handheld one: the Vita has a single 960x544
+# screen and emulating the 3DS's two panels would waste most of it.
+SRC := main_vita.c net_vita.c ime_vita.c \
        $(ROOT)/src/gfx/vita/gfx_vita.c \
-       $(ROOT)/src/ui/render.c \
+       $(ROOT)/src/ui/desktop.c \
        $(ROOT)/3ds/source/net/pong_proto.c \
        $(ROOT)/3ds/source/game/client.c
 
