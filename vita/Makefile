@@ -17,10 +17,22 @@ CFLAGS   := -std=c99 -Wall -Wextra -O2 -fno-lto \
 # the image provides no such stub -- the two disagree. CI builds vita2d from
 # source against the stubs that are actually installed, which removes the
 # reference rather than trying to satisfy it.
-LIBS     := -lvita2d -lSceDisplay_stub -lSceGxm_stub -lSceSysmodule_stub \
+# SceLibKernel and friends are what newlib's syscall layer actually calls on
+# this platform -- malloc, stdio, file I/O all route through them. Leaving them
+# out still LINKS, because the references resolve weakly, and then the first
+# stdio call jumps through an uninitialised pointer at runtime.
+#
+# That is precisely what the first two hardware crashes were: identical stack
+# pointer and caller, a different garbage PC each run, and the first one landing
+# inside newlib's own reent_list. A missing library, not a missing check.
+LIBS     := -lvita2d \
+            -lSceDisplay_stub -lSceGxm_stub -lSceSysmodule_stub \
             -lSceCtrl_stub -lSceTouch_stub -lSceCommonDialog_stub \
             -lSceAppMgr_stub \
-            -lSceNet_stub -lSceNetCtl_stub -lm
+            -lSceNet_stub -lSceNetCtl_stub \
+            -lSceLibKernel_stub -lSceIofilemgr_stub -lSceSysmem_stub \
+            -lSceProcessmgr_stub -lSceThreadmgr_stub -lSceRtc_stub \
+            -lm -lc
 
 SRC := main_vita.c \
        $(ROOT)/src/gfx/vita/gfx_vita.c \
